@@ -54,7 +54,7 @@ pub struct Window {
     pub legacy_name: Option<String>,
     pub pid: Option<u32>,
     pub r#type: WindowType,
-    pub tag: Option<TagId>,
+    pub tags: Vec<TagId>,
     pub border: i32,
     pub margin: Margins,
     pub margin_multiplier: f32,
@@ -86,7 +86,7 @@ impl Window {
             pid,
             legacy_name: None,
             r#type: WindowType::Normal,
-            tag: None,
+            tags: vec![],
             border: 1,
             margin: Margins::new(10),
             margin_multiplier: 1.0,
@@ -332,16 +332,22 @@ impl Window {
     }
 
     pub fn tag(&mut self, tag: &TagId) {
-        self.tag = Some(*tag);
+        self.tags.push(*tag);
     }
 
     #[must_use]
     pub fn has_tag(&self, tag: &TagId) -> bool {
-        self.tag == Some(*tag)
+        self.tags.contains(tag)
     }
 
-    pub fn untag(&mut self) {
-        self.tag = None;
+    pub fn untag(&mut self, tag: Option<&TagId>) {
+        if let Some(tag) = tag {
+            if let Ok(index) = self.tags.binary_search(tag) {
+                self.tags.swap_remove(index);
+            }
+            return;
+        }
+        self.tags = vec![];
     }
 
     #[must_use]
@@ -353,21 +359,23 @@ impl Window {
         self.set_floating(false);
 
         // We are reparenting.
-        if self.tag != workspace.tag {
-            self.tag = workspace.tag;
-            let mut offset = self.get_floating_offsets().unwrap_or_default();
-            let mut start_loc = self.start_loc.unwrap_or_default();
-            let x = offset.x() + self.normal.x();
-            let y = offset.y() + self.normal.y();
-            offset.set_x(x - workspace.xyhw.x());
-            offset.set_y(y - workspace.xyhw.y());
-            self.set_floating_offsets(Some(offset));
+        if let Some(wt) = workspace.tag {
+            if !self.has_tag(&wt) {
+                self.tag(&wt);
+                let mut offset = self.get_floating_offsets().unwrap_or_default();
+                let mut start_loc = self.start_loc.unwrap_or_default();
+                let x = offset.x() + self.normal.x();
+                let y = offset.y() + self.normal.y();
+                offset.set_x(x - workspace.xyhw.x());
+                offset.set_y(y - workspace.xyhw.y());
+                self.set_floating_offsets(Some(offset));
 
-            let x = start_loc.x() + self.normal.x();
-            let y = start_loc.y() + self.normal.y();
-            start_loc.set_x(x - workspace.xyhw.x());
-            start_loc.set_y(y - workspace.xyhw.y());
-            self.start_loc = Some(start_loc);
+                let x = start_loc.x() + self.normal.x();
+                let y = start_loc.y() + self.normal.y();
+                start_loc.set_x(x - workspace.xyhw.x());
+                start_loc.set_y(y - workspace.xyhw.y());
+                self.start_loc = Some(start_loc);
+            }
         }
         true
     }
@@ -388,7 +396,36 @@ mod tests {
     fn should_be_able_to_untag_a_window() {
         let mut subject = Window::new(WindowHandle::MockHandle(1), None, None);
         subject.tag(&1);
-        subject.untag();
+        subject.untag(None);
+        assert!(!subject.has_tag(&1), "was unable to untag the window");
+    }
+
+    #[test]
+    fn multiple_tags() {
+        let mut subject = Window::new(WindowHandle::MockHandle(1), None, None);
+        subject.tag(&1);
+        subject.tag(&2);
+        assert!(subject.has_tag(&1), "was unable to tag the window");
+        assert!(subject.has_tag(&2), "was unable to tag the window");
+    }
+
+    #[test]
+    fn untag_one_tag() {
+        let mut subject = Window::new(WindowHandle::MockHandle(1), None, None);
+        subject.tag(&1);
+        subject.tag(&2);
+        subject.untag(Some(&1));
+        assert!(subject.has_tag(&2), "was unable to tag the window");
+        assert!(!subject.has_tag(&1), "was unable to untag the window");
+    }
+
+    #[test]
+    fn untag_all() {
+        let mut subject = Window::new(WindowHandle::MockHandle(1), None, None);
+        subject.tag(&1);
+        subject.tag(&2);
+        subject.untag(None);
+        assert!(!subject.has_tag(&2), "was unable to untag the window");
         assert!(!subject.has_tag(&1), "was unable to untag the window");
     }
 }
