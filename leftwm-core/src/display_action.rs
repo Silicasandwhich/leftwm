@@ -61,7 +61,7 @@ pub enum DisplayAction {
     SetCurrentTags(Option<TagId>),
 
     /// Used to let the WM know of the tag for a given window.
-    SetWindowTag(WindowHandle, Option<TagId>),
+    SetWindowTags(WindowHandle, Vec<TagId>),
 
     /// Tell the DM to return to normal mode if it is not (ie resize a
     /// window or moving a window).

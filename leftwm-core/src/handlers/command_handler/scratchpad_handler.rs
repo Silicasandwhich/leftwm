@@ -44,13 +44,13 @@ fn hide_scratchpad<C: Config, SERVER: DisplayServer>(
         .find(|w| w.handle == *scratchpad_window)
         .ok_or("Could not find window from scratchpad_window")?;
 
-    window.untag();
+    window.untag(None);
     // Hide the scratchpad.
     window.tag(&nsp_tag.id);
     window.set_visible(false);
 
     // Send tag changement to X
-    let act = DisplayAction::SetWindowTag(*scratchpad_window, window.tag);
+    let act = DisplayAction::SetWindowTags(*scratchpad_window, window.tags);
     manager.state.actions.push_back(act);
     manager.state.sort_windows();
     manager
@@ -115,17 +115,17 @@ fn show_scratchpad<C: Config, SERVER: DisplayServer>(
         .iter_mut()
         .find(|w| w.handle == *scratchpad_window)
         .ok_or("Could not find window from scratchpad_window")?;
-    let previous_tag = window.tag;
-    window.untag();
+    let previous_tags = window.tags;
+    window.untag(None);
 
     // Remove the entry for the previous tag to prevent the scratchpad being
     // refocused.
-    if let Some(previous_tag) = previous_tag {
+    if !previous_tags.is_empty() {
         manager
             .state
             .focus_manager
             .tags_last_window
-            .remove(&previous_tag);
+            .remove(&previous_tags);
     }
     // Show the scratchpad.
     window.tag(current_tag);
